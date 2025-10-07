@@ -23,18 +23,39 @@ public class RequestRepresentation {
 
   private static final String PICKUP_SERVICE_POINT = "pickupServicePoint";
 
+  private static boolean isAnonymized(JsonObject json, Request req) {
+    // primary signal like LoanRepresentation: requester object absent
+    if (req.getRequester() == null) return true;
+    if (json.getString("requesterId") == null) return true;
+    if (Boolean.TRUE.equals(json.getBoolean("anonymized"))) return true;
+    if (json.getString("anonymizedDate") != null) return true;
+
+    return false;
+  }
+
   public JsonObject extendedRepresentation(Request request) {
     final JsonObject requestRepresentation = request.asJson();
+    final boolean anonymized = isAnonymized(requestRepresentation, request);
 
     addItemProperties(requestRepresentation, request.getItem());
     addInstanceProperties(requestRepresentation, request.getInstance(), request.getItem());
     addAdditionalLoanProperties(requestRepresentation, request.getLoan());
-    addAdditionalRequesterProperties(requestRepresentation, request.getRequester());
-    addAdditionalProxyProperties(requestRepresentation, request.getProxy());
-    addAdditionalServicePointProperties(requestRepresentation, request.getPickupServicePoint());
-    addDeliveryAddress(requestRepresentation, request, request.getRequester());
-    addPrintDetailsProperties(request, requestRepresentation);
+    if (anonymized) {
+      requestRepresentation.remove("requester");
+      requestRepresentation.remove("deliveryAddress");
+    } else {
+      addAdditionalRequesterProperties(requestRepresentation, request.getRequester());
+      addDeliveryAddress(requestRepresentation, request, request.getRequester());
+    }
 
+    if (request.getProxy() != null) {
+      addAdditionalProxyProperties(requestRepresentation, request.getProxy());
+    } else {
+      requestRepresentation.remove("proxy");
+    }
+
+    addAdditionalServicePointProperties(requestRepresentation, request.getPickupServicePoint());
+    addPrintDetailsProperties(request, requestRepresentation);
     removeSearchIndexFields(requestRepresentation);
 
     return requestRepresentation;
